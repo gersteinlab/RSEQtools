@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ $# -eq 1 ] 
+    then    
+    if [ $1 == "bas" -o $1 == "dev" ] 
+	then
+	export BICOSN=$1
+	export PS1="$BICOSN \u@\H:\w> "
+    else
+	echo "Usage: source bicosdefenv bas|dev"
+    fi
+else
+    echo "Usage: source bicosdefenv bas|dev"
+fi

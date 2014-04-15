@@ -1,0 +1,177 @@
+/*****************************************************************************
+* Copyright (C) 2001,  F. Hoffmann-La Roche & Co., AG, Basel, Switzerland.   *
+*                                                                            *
+* This file is part of "Roche Bioinformatics Software Objects and Services"  *
+*                                                                            *
+* This file is free software; you can redistribute it and/or modify          *
+* it under the terms of the GNU General Public License (GPL) as published by *
+* by the Free Software Foundation; either version 2 of the License, or       *
+* (at your option) any later version.                                        *
+*                                                                            *
+* This file is distributed in the hope that it will be useful,               *
+* but WITHOUT ANY WARRANTY; without even the implied warranty of             *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
+* GNU General Public License for more details.                               *
+*                                                                            *
+* To obtain a copy of the GNU General Public License                         *
+* please write to the Free Software                                          *
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  *
+* or use the WWW site http://www.gnu.org/copyleft/gpl.txt                    *
+*                                                                            *
+* SCOPE: this licence applies to this file. Other files of the               *
+*        "Roche Bioinformatics Software Objects and Services" may be         *
+*        subject to other licences.                                          *
+*                                                                            *
+* CONTACT: clemens.broger@roche.com or detlef.wolf@roche.com                 *
+*                                                                            *
+*****************************************************************************/
+
+
+
+Programmers' guide to the Array package
+---------------------------------------
+
+
+The array package contains implements a set of C-macros and
+functions for efficient handling of variable size arrays. It is
+closely derived from the code found in the ACEDB genome database
+package written by Richard Durbin and Jean Thierry-Mieg.
+
+
+The array package gives arbitrary length extendable
+arrays, called Arrays (with a capital initial 'A').  They are
+accessed via macros for efficiency when you are sure that they are
+not being extended.  Many other functions are in fact macros to
+give a cleaner programmer's interface (see the header file array.h
+for details).
+
+Basic operations:
+
+	Array arrayCreate(int n, TYPE)
+
+n is the initial size.  TYPE is a legitimate type.  sizeof(TYPE) is
+taken (in a macro) to determine what size objects to have in the
+array. The array is initialized to binary zeros.
+
+	BOOL  arrayDestroy(Array a)
+
+This is a macro that returns destroys a (releasing all its memory)
+and returns TRUE if a is non-zero, and returns FALSE if a == 0.
+
+	int arrayMax(Array a)
+
+Returns the largest index addressed so far plus one.  i.e. the
+number of elements.  A (very) common use is as an upper bound to a
+loop, e.g.: 
+
+	for (i = 0 ; i < arrayMax(a) ; ++i)
+	  x += arru(a,i,float) ;
+
+arrayMax() is read-only (although the compiler does not check this).
+
+Use arrayClear(ar) to fill the memory allocated to the Array
+with binary zeros and set mark the Array is empty (arrayMax()==0).
+Memory is not freed. If you don't need the binary zero fill,
+one can use arraySetMax(a,0) which is faster.
+
+
+	TYPE  array(Array a, int i, TYPE)
+	TYPE* arrayp(Array a, int i, TYPE)
+	TYPE  arru(Array a, int i, TYPE)
+	TYPE* arrp(Array a, int i, TYPE)
+
+These are the basic functions to access members of an Array.  They
+can all be used as lvalues as well as rvalues, i.e. you can assign
+to them.  arrayp() and arrp() give a pointer to the i'th element of
+a, while array() and arru() give the element itself.  array() and
+arrayp() make subroutine calls that check whether i >= arrayMax(a),
+and if so extend the array if necessary and update arrayMax(a).
+In this case the added space is initialized to binary zeros.
+arru() and arrp() are pure macros that do not check arrayMax(a) and
+should therefore only be used for accessing existing entries, not
+for creating new ones that might go beyond the previous limits.
+
+
+
+Minor Array routines:
+
+  Array arrayCopy(Array a)	- gives a copy, including contents
+  int   arrayNumber(void)	- returns the number of alive arrays
+To ensure a capacity of at least n elements:
+  array(a, n-1, TYPE) ;           - just access the n th element
+
+
+arraySetMax(Array ar, int j)  -  sets arrayMax; can also
+                                 extend array; if shrinking
+                                 the array this does not clear
+                                 or free memory (see also arrayClear()).
+
+Sorted Array package
+--------------------
+
+A number of additional routines are very useful for maintaining
+sorted arrays.  Many of them make use of an order() function passed
+by the user, exactly as with Unix sort().  
+	order(TYPE *x, TYPE *y)
+  should return negative if x < y, 0 if x == y, positive if x > y.
+All the equality matches in these functions are byte-wise matches.
+ 
+void arraySort(Array a, int (*order)(void *, void *))
+		- Sorts a in ascending order of order(). 
+		  Uses qsort().  Does not remove duplicates.
+BOOL arrayIsEntry(Array a, int i, void *s)
+		- returns TRUE if arru(a,i,) matches *s, else FALSE
+BOOL arrayFind(Array a, void *s, int *ip, int (*order)(void *, void *))
+		- if *s matches any arru(a,i,) sets *ip = i and 
+		  returns TRUE, else FALSE
+BOOL arrayInsert(Array a, void * s, int (*order)(void *, void *))
+		- s is a pointer to a potential entry.  
+		  Returns FALSE if arrayFind (a, s, &junk, order)
+		  else inserts *s in order.
+BOOL arrayFindInsert(Array a, void *s, int *ip, int (*order)(void *, void *));
+		- s is a pointer to a potential entry.  
+		  Returns FALSE (0) if arrayFind (a, s, &junk, order)
+		  else inserts *s in order and return TRUE (1) ;
+                  *ip is filled with the index of *s in a where
+                  found or inserted
+BOOL arrayRemove(Array a, void * s, int (*order)(void *, void *))
+		- if arrayFind(a, s, &junk, order) removes it and
+		  returns TRUE, else returns FALSE
+void arrayByteUniq(Array a)
+		- removes bytewise duplicate entries - assumes
+		  already sorted.
+void arrayUniq(Array a, Array b, int(*order)(void *, void *))
+		- removes duplicate entries - assumes
+		  already sorted with same function order().
+
+
+Notes: 
+as of August 1999, prototypes of all functions of the sorted array package 
+receiving an ordering function as a parameter have been changed from e.g.
+  void arraySort(Array a, int (*order)() ;
+to 	
+  void arraySort(Array a, int (*order)(void *, void *)) ;
+to allow for a better type-checking by the compiler.
+
+Most real-world ordering functions will however not take two void pointers
+as arguments but two pointers to the data type to be compared, e.g. 
+  int arrayStrcmp(char **, char **) ;
+
+The compiler can now (that the prototypes have been completed) detect this
+mismatch and will probably issue a warning when you recompile existing code
+like this:
+  arraySort(a, &arrayStrcmp);
+If you want to get rid of these warnings you have to explicitly cast the 
+ordering function's type to match the prototype, e.g.
+  arraySort(a, (int (*)(void *, void *)) &arrayStrcmp) ;
+
+This way, the compiler is happy, but can still warn you when your cast
+cannot be applied. You're having an explicit cast in your code reminding
+you what you're actually doing here. And the code will compile the same
+on all platforms.
+
+Since the cast (int(*)(void *,void *)) might be hard to remember
+the macro ARRAYORDERF has been defined to allow for this coding style:
+  arraySort(a, (ARRAYORDERF) &arrayStrcmp) ;
+
+

@@ -1,0 +1,269 @@
+/*****************************************************************************
+*                                                                            *
+*  Copyright (C) 2001,  F. Hoffmann-La Roche & Co., AG, Basel, Switzerland.  *
+*                                                                            *
+* This file is part of "Roche Bioinformatics Software Objects and Services"  *
+*    written by the bioinformatics group at Hoffmann-La Roche, Basel.        *
+*      It shall not be reproduced or copied or disclosed to others           *
+*                      without written permission.                           *
+*                                                                            *
+*                          - All rights reserved -                           *
+*                                                                            *
+* CONTACT: clemens.broger@roche.com or detlef.wolf@roche.com                 *
+*                                                                            *
+*****************************************************************************/
+
+                                                 
+                                                 
+String Handling in the Roche Bioinformatics C library 
+-----------------------------------------------------
+
+In the standard C library strings of characters are implemented
+as array of char (char[]) with a trailing NUL character ('\0') marking
+the end of the string. This implementation delights by simplicity
+but limits its usefulness:
+- performance: to find the end of a string there is no other way
+               then reading the whole string; thus strlen() on
+               a long string is slow; loops like
+                 char *s; int i ;
+                 s = ...
+                 for (i=0; i<strlen(s); ++i) { ... }
+               are especially bad if s is long
+- memory management: the programmer is responsible for allocating
+               the memory needed for a string; there are no functions
+               for automatically adjusting memory allocation to
+               string size.
+
+Therefore a module has been written that cures the above shortcomings.
+The string module is a thin wrapper around the Array package.
+For using the string module it is except for one case (see example below)
+not necessary to understand the dynamic Array module. Although
+i think it is a good idea to read it anyway (see file array.txt).
+
+For using the dynamic string functions you need to
+
+#include "format.h"
+
+
+
+String functions by examples
+----------------------------
+
+1. creating a string
+
+    Stringa s = stringCreate(10) ;
+
+  Defines a variable named 's' of type String. The argument '10' to
+  stringCreate() is only a hint to the module for allocating memory.
+  In this case the module will allocate space for a string of length 9.
+  If more is needed the allocated space is automatically expanded.
+  There is a very slight performance gain if stringCreate() is used
+  with the right initial size, since the time for expanding is saved.
+  Note that although space for 9 chars has been allocated, the length
+  of the string after creating it is zero.
+  Thus:
+    Stringa s = stringCreate(10) ;
+    printf("%d", stringLen(s)) ;
+  prints 0.
+
+
+2. putting something into a string
+
+     Stringa s = stringCreate(10) ;
+     stringCat(s, "abc") ;
+
+  appends the string "abc" to s. The memory needed to expand s is
+  automatically allocated as needed. The implementation tries to
+  keep the number of reallocations small because they are computationally
+  expensive. For details see the documentation on the Array module.
+  Note that stringCat() has the signature stringCat(Stringa s, char *s2):
+  It appends a standard C library string 'char *s' or ' char s[]' to
+  a dynamic Stringa. There is no function of the type
+  stringCat(Stringa s, Stringa s2), see below.
+  For many of the standard C library string functions there is an
+  equivalent for dynamic Strings:
+
+     strncat   -->  stringNCat() 
+     strcpy    -->  stringCpy()
+     strncpy   -->  stringNCpy()
+     sprintf   -->  stringPrintf()
+                    stringAppendf()
+
+  if you don't want to use stringPrintf(), this also works:
+
+     Stringa s = stringCreate(10) ;
+     stringCat(s, "i am ") ;
+     stringCatInt(s, 36) ;
+     stringCat(s, " years old.") ;
+     
+  to get rid of all chars in a string, use
+
+     stringClear()
+
+
+3. treating dynamic strings as standard C library strings
+
+  As stated above, the Stringa type is different from char* .
+  Therefore it is not possible, to write
+  
+    Stringa s = stringCreate(10) ;
+    puts(s) ;
+
+  However, internally the implementation of dynamic strings
+  is a standard '\0'-terminated C string with a little prefix
+  containing the string length and other administrative
+  data. Therefore it is possible at zero cost to cast a Stringa
+  into a char* . The syntax is:
+
+    Stringa dynamicstring = stringCreate(10) ;
+    char *cstring ;
+    stringCpy(dynamicstring, "Hello World") ;
+    cstring = string(dynamicstring) ;         /* <--- look here */
+    puts(cstring) ;
+
+  THIS IMPLIES THAT ALL THE STANDARD C STRING FUNCTIONS 
+  (e.g. strstr(), strchr(), strcmp(), strncasecmp(), ...)
+  ALSO WORK ON DYNAMIC STRINGS.
+  Example:
+
+    Stringa dynamicstring = stringCreate(10) ;
+    stringCpy(dynamicstring, "Hello World") ;
+    puts( strchr(string(dynamicstring), 'W') ) ;   
+
+  prints "World".
+    
+  You should usually not modify the dynamic string using
+  standard C string functions, e.g.
+
+    Stringa s = stringCreate(10) ;
+    strcat(string(s), "crash")) ;
+
+  will corrupt memory and provoke random crashes.
+
+
+
+4. manipluating dynamic strings on a per-character basis
+
+  As we saw earlier, the following is legal:
+  
+    Stringa s = stringCreate(10) ;  
+    char *cp ;
+    ... populate s ...
+    cp = string(s) - 1 ;
+    while (*++cp)
+      putchar(*cp) ;
+
+  however, for people who want to treat the Stringa as
+  a dynamic Array of characters, there is a cleaner (or clearer?)
+  interface: stringC(s,i) accesses the i.th char (counting from 0) of s.
+  e.g.
+
+    Stringa s = stringCreate(10) ;  
+    int i ;
+    ... populate s ...
+    for (i=0; i<stringLen(s); ++i)
+      putchar(stringC(s,i)) ;
+
+  is equivalent to the previous example.
+  Note that stringLen(s) has the same the result as strlen(string(s)).
+  However stringLen() is much faster since it does not need to traverse
+  the whole string to determine its length.
+
+  It is ok to change characters within the dynamic string, e.g.
+
+    Stringa s = stringCreate(10) ;
+    stringCpy(s, "Hallo") ; 
+    stringC(s,1) = 'e' ;
+
+  Translates from German into English.
+  What is NOT ok:
+
+    stringC(s,1) = '\0' ;
+
+  Since this destroys the internal consistency of the dynamic string.
+  stringCat(s), stringLen(s) etc. will produce wrong results.
+  Setting a char to '\0' has the special meaning 'terminate here'.
+  So there is an extra function for this purpose:
+
+    Stringa s = stringCreate(10) ;
+    stringCpy(s, "Hallo") ; 
+    stringTerminateI(s,1) ;
+    printf("%d", stringLen(s)) ;
+
+  will print 1, since only the "H" is left in the string.
+
+  The remaining character-based function for dynamic strings is
+  stringCp(s,i): it returns a pointer to the i.th character.
+  stringCp(s,i) is equivalent to (string(s)+i).
+
+  Note there are no functions like
+  stringChar(s,i) analogous to array(a,i,type) that would allow
+  to extend the string by characters. What you would usually want
+  to do in this case is stringCat().
+
+  If you really want to build a string char by char, 
+  you need to know about the Array module, too.
+  In this case you cannot start with a Stringa type, but have to
+  start with a dynamic Array of char (without trailing '\0') 
+  and later convert it into a Stringa using the functions 
+  stringTerminate(). 
+  Example:
+
+    Stringa s1 = stringCreate(10) ;
+    Stringa s2 = arrayCreate(10, char) ;  /* <--- here is the trick */
+    int i ;
+    stringCpy(s1, "ollaH") ;
+    for (i=stringLen(s1)-1; i>=0; --i) 
+      array(s2, arrayMax(s2), char) = stringC(s1,i) ;
+    stringTerminate(s2) ;
+    puts(string(s2)) ;
+
+  Will print "Hallo".
+
+
+
+  BEWARE of storing pointers into dynamic strings:
+
+    Stringa s = stringCreate(5) ;
+    char *cp ;
+    stringCpy(s, "Hello") ;
+    cp = string(s) ;
+    stringCat(s, "World") ;
+    puts(cp) ;
+
+  Will not work, since extending s will re-allocate the memory,
+  thus invalidating the contents of cp.
+  Don't fall into this trap. Such bugs are VERY HARD to find.
+
+
+
+5. manipulating substrings         
+
+   one can insert substrings at arbitray locations, e.g.
+
+     String s = stringCreate(10) ;
+     stringCpy(s, " World") ;
+     stringInsert(s, 0, "Hello") ;
+     puts(string(s)) ;
+
+   prints "Hello World".
+
+   other functions of this type are:
+   stringChop()   -- to chop off a few chars from the right end
+   stringCut()    -- to cut out arbitray pieces
+   stringTrim()   -- to remove chars from left and/or right ends.
+   stringTranslate()  -- to replace and/or delete sets of chars;
+                         almost the Perl/Unix 'tr' command.
+ 
+
+
+More functions, still needing to be documented:
+  stringCreateClear
+  stringDestroy
+  stringAdjust
+
+
+____________________________________________________________
+This string handling module is based on a variation of the
+Array module orginially developed by J-T.Mieg and R.Durbin
+for the ACeDB genome database system.

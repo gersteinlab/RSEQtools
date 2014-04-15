@@ -1,0 +1,9 @@
+
+Simple test programs:
+mrf2wig test < test.mrf 
+mrf2gff test < test.mrf 
+
+
+For a more detailed example, please refer to:
+http://wiki.gersteinlab.org/pubinfo/RSEQtools/workflow
+

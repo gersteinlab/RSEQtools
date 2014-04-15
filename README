@@ -1,0 +1,42 @@
+
+Introduction
+============
+
+RSEQtools contains a general C library (bios) and set of modules to analyze 
+RNA-Seq data sets (mrf).
+
+For more information please refer to http://rseqtools.gersteinlab.org/ 
+
+
+Installation
+============
+
+The installation steps have to be executed in the following order:
+
+1) Install the GNU Scientific Library
+
+2) Install BIOS
+
+   - Set the following environment variables:
+     BIOINFOCONFDIR=/pathTo/RSEQtools/bios/conf
+     BIOINFOGSLDIR=/pathTo/gsl-X.XX
+
+   - Compiling BIOS:
+     cd pathTo/RSEQtools/bios
+     make
+     make prod
+
+3) Install MRF components
+     cd pathTo/RSEQtools/mrf
+     make
+
+
+
+Important Note
+==============
+
+THIS PACKAGE (BIOS and MRF) IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES
+OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+

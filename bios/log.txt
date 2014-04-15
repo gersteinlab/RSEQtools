@@ -1,0 +1,103 @@
+/*****************************************************************************
+* Copyright (C) 2001,  F. Hoffmann-La Roche & Co., AG, Basel, Switzerland.   *
+*                                                                            *
+* This file is part of "Roche Bioinformatics Software Objects and Services"  *
+*                                                                            *
+* This file is free software; you can redistribute it and/or modify          *
+* it under the terms of the GNU General Public License (GPL) as published by *
+* by the Free Software Foundation; either version 2 of the License, or       *
+* (at your option) any later version.                                        *
+*                                                                            *
+* This file is distributed in the hope that it will be useful,               *
+* but WITHOUT ANY WARRANTY; without even the implied warranty of             *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
+* GNU General Public License for more details.                               *
+*                                                                            *
+* To obtain a copy of the GNU General Public License                         *
+* please write to the Free Software                                          *
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  *
+* or use the WWW site http://www.gnu.org/copyleft/gpl.txt                    *
+*                                                                            *
+* SCOPE: this licence applies to this file. Other files of the               *
+*        "Roche Bioinformatics Software Objects and Services" may be         *
+*        subject to other licences.                                          *
+*****************************************************************************/
+
+                                           Tue Mar 19 17:11:07 MET 1996  wolfd
+Programmers Guide to the Logging package
+
+The Logging package is meant to provide basic messaging service
+to C programs.
+
+ 
+void die (char *format,...) ;
+  function is like die in perl, i.e. the process print a message to
+  stderr and exits with code 1
+  usage is like printf()
+
+void warn (char *format,...) ;
+  function is like die(), but does not quit
+
+void LogOpen (char *fname) ;
+  enables logging to file fname (append)
+  stderr is also redirected to that file
+  this is usefull for web programs whose stderr messages otherwise
+  end up in the server's log
+
+void Log(char *format,...) ;
+  write a message to the log file, or stderr if there was no LogOpen()
+  usage is like printf()  
+
+void LogClose () ;
+
+
+
+------------------------------------------------------------
+READ THIS ONLY IF YOU WANT TO SPEND A LOT OF TIME
+AND INTEND RE-DESIGNING THE LOG MODULE:
+
+
+Logging has to cope with the following requirements:
+- address messages to user and/or programmer
+- work in WWW and in vt100 environment
+- handle aborting messages
+- turn debugging messages on/off
+- work across C and perl
+and respect the unix enviroment (stderr, stdout),
+and the standard output methods (perl: die(), warn(); C: fprintf).
+If a program used perl's die, then the log module should not catch
+this. better replace
+die(list) with &Log::l("a",list)
+giving much better control.
+
+Implementation:
+
+perl:
+Log::Open([application_name],[logfile_name])
+ reads from env:
+ application_name -- $0 is the default
+ logfile_name - default unnamed.log
+ DEBUG - if it exists then debug messages enabled
+ DEBUGDEST - stderr,stdout,file  where debugging messages should go to
+             several can be on
+Log::setDest(stderr,stdout,file) -- overrides DEBUGDEST
+Log::setDebug(true/false) -- toggle debugging after initialization and open
+Log::Close() ;
+Log::l(mode,msg[,params]) -- log a message
+  mode: string containing
+   u -- message to user  (stdout)
+   p -- message to programmer
+   d -- deliver message only when DEBUG is on
+   a -- if message is to be delivered then abort process
+  msg, params: like for printf()
+Log::log(msg) -- like Log::l("p",msg)
+
+
+C:
+LogOpen()
+LogL()
+LogSetDest()
+LogSetDebug()
+LogClose()
+
+
